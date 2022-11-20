@@ -6,13 +6,32 @@ from docx import Document
 
 from about_app import about_db_pro
 from login_app import user_login
-from change_db import response_db, update_db, CONNECT, COLS
+from change_db import response_db, update_db, CONNECT, COLS, REGISTRY
+
+cols = COLS
+
+# Список с таблицами базы данных
+selector = ['Таблица кандидатов', 'Таблица обратной связи']
+viewcolumns = [cols[1]] + [cols[3]] + [cols[5]] + [cols[-3]] + [cols[-2]]
+
+
+# выбор таблицы БД из выпадающего списка
+def select_item(event):
+    global cols
+    global viewcolumns
+    # получаем выбранный элемент
+    selection = combobox.get()
+    if selection == selector[1]:
+        cols = REGISTRY
+        viewcolumns = [REGISTRY[1]] + [REGISTRY[2]] + [REGISTRY[3]] + [REGISTRY[4]] + [REGISTRY[9]] + [REGISTRY[10]]
+    else:
+        pass
 
 
 # клик по кнопке поиск в БД записей по ФИО и дате рождения
 def db_search():
     query = "SELECT * FROM candidates WHERE full_name like ? and birthday like ?"
-    value = tuple([str(j) for j in [fio_search.get(), dr_search.get()]])
+    value = tuple(map(str, [fio_search.get(), dr_search.get()]))
     try:
         search = [h for h in response_db(CONNECT, query, value)]
         # удаляем старые записи в окне таблицы
@@ -25,22 +44,7 @@ def db_search():
         messagebox.showinfo(title="Результат проверки", message="Запись в БД не найдена")
 
 
-# клик по кнопке поиск в БД записей по SQL-запросу
-def db_search_where():
-    query = (str(sql_search.get()))
-    try:
-        search = [h for h in response_db(CONNECT, query, value='')]
-        # удаляем старые записи в окне таблицы
-        for j in tree.get_children():
-            tree.delete(j)
-        # записываем найденные записи
-        for k in range(len(search)):
-            tree.insert('', 'end', values=search[k])
-    except IndexError:
-        messagebox.showinfo(title="Результат проверки", message="Запись в БД не найдена")
-
-
-# общий запрос в БД перед стартом программы
+# обновить данные в окне таблицы
 def start_query():
     query = "SELECT * FROM candidates ORDER BY date_check DESC LIMIT 5"
     try:
@@ -72,10 +76,10 @@ def take_info():
     file_query = '/home/semenenko/Загрузки/yourfile.docx'
     document = Document()
     # создаем таблицу Word
-    table = document.add_table(rows=len(COLS), cols=2)
+    table = document.add_table(rows=len(cols), cols=2)
     table.style = 'Table Grid'
-    for j in range(len(COLS)):
-        table.rows[j].cells[0].text = COLS[j]
+    for j in range(len(cols)):
+        table.rows[j].cells[0].text = cols[j]
         table.rows[j].cells[1].text = selected_people.split('\n')[j]
     document.save(file_query)
     subprocess.call(["xdg-open", file_query])
@@ -97,7 +101,7 @@ if __name__ == '__main__':
 
     main_menu = Menu()
     menu_label_lst = ['Войти в БД', 'Настройки', 'О программе']
-    command_lst = [user_login, 'settings', about_db_pro]
+    command_lst = [user_login, 'change_settings', about_db_pro]
     for n in range(len(command_lst)):
         main_menu.add_command(label=menu_label_lst[n], command=command_lst[n], font=('Arial', 10))
         master.config(menu=main_menu)
@@ -107,6 +111,15 @@ if __name__ == '__main__':
     db_frame.grid(row=0, column=0, columnspan=4, rowspan=1, pady=10, padx=10)
     for i in range(3):
         db_frame.columnconfigure(i, weight=1)
+
+    # комбобокс выбора таблицы с данными
+    Label(db_frame, text='Выбор таблицы', font=('Arial', 10),
+          width=30, anchor='w', padx=10, pady=10).grid(row=2, column=0)
+    combobox = ttk.Combobox(db_frame, values=selector, state="readonly", width=40)
+    combobox.current(0)
+    combobox.grid(row=2, column=1, pady=10, padx=10)
+    combobox.bind("<<ComboboxSelected>>", select_item)
+    Button(db_frame, text="Применить", command=lambda: master.update).grid(row=2, column=2)
 
     # создаем название видежетов на вкладке База данных
     txt_search = ['Фамилия Имя Отчество', 'Дата рождения']
@@ -119,39 +132,33 @@ if __name__ == '__main__':
     dr_search = StringVar()
     dr_search.set("ДД.ММ.ГГГГ")
     Entry(db_frame, textvariable=dr_search, width=40).grid(row=1, column=1)
-    Label(db_frame, text='Найти по условию', font=('Arial', 10),
+    Label(db_frame, text='Найти по условиям:', font=('Arial', 10),
           width=40, anchor='center', padx=10, pady=10).grid(row=0, column=2)
     Button(db_frame, text="Поиск", command=db_search).grid(row=1, column=2)
-    # поиск по sql запросу
-    Label(db_frame, text='Запрос в формате SQL', font=('Arial', 10),
-          width=30, anchor='w', padx=10, pady=10).grid(row=2, column=0)
-    sql_search = StringVar()
-    sql_search.set("Select * from candidates where...")
-    Entry(db_frame, textvariable=sql_search, width=40).grid(row=2, column=1)
-    Button(db_frame, text="SQL запрос", command=db_search_where).grid(row=2, column=2)
-    Label(db_frame, text='Результаты поиска', font=('Arial', 10),
-          width=30, anchor='w', padx=10, pady=10).grid(row=3, column=1)
     Button(db_frame, text="Выгрузить данные", command=take_info).grid(row=0, column=3)
     Button(db_frame, text="Изменить данные", command=change_db).grid(row=1, column=3)
     Button(db_frame, text="Обновить данные", command=start_query).grid(row=2, column=3)
 
     # фрейм и таблица записей из БД
     frame_table = Frame(master)
-    frame_table.grid(row=4, column=0, columnspan=4, rowspan=1, pady=10, padx=20)
-    for col in range(len(COLS)):
-        frame_table.columnconfigure(col, weight=1)
+    frame_table.grid(row=1, column=0, columnspan=4, rowspan=1, padx=10, pady=10, sticky="nsew")
+    for i in range(3):
+        frame_table.columnconfigure(i, weight=1)
+
+    Label(frame_table, text='Результаты поиска:', font=('Arial', 11, 'bold'),
+          width=30, anchor='center', padx=10, pady=10).grid(columnspan=3, row=0, column=0)
 
     # настройки скролбаров
     x_scrollbar = Scrollbar(frame_table, orient='horizontal')
-    x_scrollbar.grid(row=1, column=0, columnspan=3, sticky='E' + 'W')
+    x_scrollbar.grid(row=2, column=0, columnspan=3, sticky='E' + 'W')
     y_scrollbar = Scrollbar(frame_table, orient='vertical')
-    y_scrollbar.grid(row=0, column=3, sticky='N' + 'S')
+    y_scrollbar.grid(row=1, column=4, sticky='N' + 'S')
 
     # размещение столбцов, строк  и др.
-    tree = ttk.Treeview(frame_table, columns=COLS, height=5, show="headings",
-                        displaycolumns=[COLS[1]] + [COLS[3]] + [COLS[5]] + [COLS[-3]] + [COLS[-2]],
+    tree = ttk.Treeview(frame_table, columns=cols, height=5, show="headings",
+                        displaycolumns=viewcolumns,
                         xscrollcommand=x_scrollbar.set, yscrollcommand=y_scrollbar.set)
-    tree.grid(row=0, column=0, columnspan=3, sticky='E' + 'W')
+    tree.grid(row=1, column=0, columnspan=3, sticky='E' + 'W')
     x_scrollbar['command'] = tree.xview
     y_scrollbar['command'] = tree.yview
 
@@ -160,29 +167,26 @@ if __name__ == '__main__':
         tree.heading(col, text=f"{col}", anchor='center')
         tree.column(col, anchor='center', width=160)
 
-    # загрузка записей по умолчанию на старте программы
-    # search_query = start_query()
-    # for i in range(len(search_query)):
-    #     tree.insert('', 'end', values=search_query[i])
-
     # выбор строки в таблице результатов
     tree.bind("<<TreeviewSelect>>", item_selected)
 
     # фрейм и текстовое поле для выбранной записи из таблицы БД
     frame_select = Frame(master)
-    frame_select.grid(row=5, column=0, columnspan=4, rowspan=1, pady=10, padx=20)
+    frame_select.grid(row=2, column=0, columnspan=4, rowspan=1, pady=10, padx=20, sticky="nsew")
+    for i in range(3):
+        frame_select.columnconfigure(i, weight=1)
+
+    Label(frame_select, text='Просмотр информации:', font=('Arial', 11, 'bold'),
+          width=30, anchor='center', padx=10, pady=10).grid(columnspan=3, row=0, column=0)
 
     # параметры текстового поля
-    editor = Text(frame_select, height=24, wrap="word")
-    editor.grid(column=0, row=0, sticky='E' + 'W')
+    editor = Text(frame_select, wrap="word")
+    editor.grid(columnspan=3, column=0, row=1, sticky='nsew')
 
     #  скроллбары текстового поля
     ys = ttk.Scrollbar(frame_select, orient="vertical", command=editor.yview)
-    ys.grid(column=3, row=0, sticky='N' + 'S')
-    xs = ttk.Scrollbar(frame_select, orient="horizontal", command=editor.xview)
-    xs.grid(column=0, row=1, sticky='E' + 'W')
+    ys.grid(column=4, row=1, sticky='ns')
     editor["yscrollcommand"] = ys.set
-    editor["xscrollcommand"] = xs.set
 
     # запуск главного окна
     master.mainloop()
