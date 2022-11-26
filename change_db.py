@@ -1,15 +1,8 @@
 from tkinter import Toplevel, Label, Button, Frame, Text, ttk, messagebox
 import sqlite3
 
-CONNECT = '/home/semenenko/MyProjects/Python/Share_db_files/candidates.db'
-# CONNECT = r'\\cronosx1\New folder\УВБ\Отдел корпоративной защиты\candidates.db'
-
-COLS = ['id', 'Должность', 'Подразделение', 'Фамилия Имя Отчество', 'Предыдущее ФИО', 'Дата рождения',
-        'Место рождения', 'Гражданство', 'Серия паспорта', 'Номер паспорта', 'Дата выдачи', 'СНИЛС', 'ИНН',
-        'Адрес регистрации', 'Адрес проживания', 'Телефон', 'Электронная  почта', 'Образование',
-        'Проверка по местам работы', 'Проверка паспорта', 'Проверка долгов', 'Проверка банкротства',
-        'Проверка по БКИ', 'Проверка аффилированности', 'Проверка Internet', 'Проверка Сronos', 'Проверка Cros',
-        'Результат', 'Дата проверки', 'Сотрудник']
+# местонахождение базы данных
+CONNECT = r'\\cronosx1\New folder\УВБ\Отдел корпоративной защиты\candidates.db'
 
 # название столбцов таблицы кандидатов базы данных
 SQL = ['id', 'staff', 'department', 'full_name', 'last_name', 'birthday', 'birth_place', 'country', 'series_passport',
@@ -17,23 +10,51 @@ SQL = ['id', 'staff', 'department', 'full_name', 'last_name', 'birthday', 'birth
        'check_work_place', 'check_passport', 'check_debt', 'check_bankruptcy', 'check_bki', 'check_affiliation',
        'check_internet', 'check_cronos', 'check_cross', 'resume', 'date_check', 'officer']
 
-# название столбцов таблицы реестр базы данных
-REGISTRY = ["id", "fio", "birthday", "staff", "checks", "recruiter", "date_in", "officer", "date_out", "result",
-            "final_date", "url"]
+# русские названия столбцов таблицы кандидатов базы данных
+COLS = ['id', 'Должность', 'Подразделение', 'Фамилия Имя Отчество', 'Предыдущее ФИО', 'Дата рождения',
+        'Место рождения', 'Гражданство', 'Серия паспорта', 'Номер паспорта', 'Дата выдачи', 'СНИЛС', 'ИНН',
+        'Адрес регистрации', 'Адрес проживания', 'Телефон', 'Электронная  почта', 'Образование',
+        'Проверка по местам работы', 'Проверка паспорта', 'Проверка долгов', 'Проверка банкротства',
+        'Проверка по БКИ', 'Проверка аффилированности', 'Проверка Internet', 'Проверка Сronos', 'Проверка Cros',
+        'Результат', 'Дата проверки', 'Сотрудник']
 
 
-# запрос в базу данных
-def response_db(db, query, value):
-    try:
-        with sqlite3.connect(db) as con:
-            cur = con.cursor()
-            cur.execute(query, value)
-            if 'INSERT' in query:
-                con.commit()
-            record_db = cur.fetchall()
-    except sqlite3.Error as error:
-        print('Ошибка', error)
-    return record_db
+class TopWindow(Toplevel):
+    """Объявляем класс Window для работы с окном"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.title('База данных')
+        self.geometry('640x560')
+        self.columnconfigure(0, weight=1)
+        self.option_add('*Dialog.msg.font', 'Arial 10')
+
+
+class WinFrame(Frame):
+    """Объявляем класс WinFrame для работы с фреймами"""
+
+    def __init__(self, parent) -> None:
+        super().__init__(parent)
+
+
+class Database:
+    """Объявляем класс Database для работы с базой данных"""
+
+    def __init__(self, database, query, value):
+        self.database = database
+        self.query = query
+        self.value = value
+
+    # функция для передачи запроса в БД
+    def insert_db(self):
+        try:
+            with sqlite3.connect(self.database, timeout=5.0) as con:
+                cur = con.cursor()
+                cur.execute(self.query, self.value)
+                record_db = cur.fetchall()
+        except sqlite3.Error as error:
+            print('Ошибка', error)
+        return record_db
 
 
 # запустить окно редактирования базы данных
@@ -46,7 +67,8 @@ def update_db(selected_people):
     def change_value():
         query = f"UPDATE candidates SET '{sql_col_dict[idx]}' = ? where id = ?"
         value = tuple(map(str, [editor.get("1.0", "end").strip(), selected_people[0]]))
-        resp = response_db(CONNECT, query, value)
+        response = Database(CONNECT, query, value)
+        resp = response.insert_db()
         if len(resp):
             messagebox.showinfo(title="Ошибка", message="Проверьте данные", parent=master)
         else:
@@ -65,14 +87,10 @@ def update_db(selected_people):
                 idx = key  # индекс для передачи в SQL запрос на изменение значения.
         return idx
 
-    # старт окна базы данных
-    master = Toplevel()
-    master.title('База данных')
-    master.geometry('760x640')
-    master.columnconfigure(0, weight=1)
-
+    # старт окна изменения базы данных
+    master = TopWindow()
     # создаем фрейм для размещения элементов
-    frame_db = Frame(master)
+    frame_db = WinFrame(master)
     frame_db.grid(row=0, column=0, columnspan=2, rowspan=1, pady=10, padx=10)
 
     # создаем динамический лейбл для информации
@@ -91,10 +109,9 @@ def update_db(selected_people):
     # создаем  скроллбар
     ys = ttk.Scrollbar(frame_db, orient="vertical", command=editor.yview)
     ys.grid(column=1, row=2, sticky='N' + 'S')
-    # xs = ttk.Scrollbar(frame_db, orient="horizontal", command=editor.xview)
-    # xs.grid(column=0, row=3, sticky='E' + 'W')
     editor["yscrollcommand"] = ys.set
-    # editor["xscrollcommand"] = xs.set
 
     # создаем кнопку для обновления  информации в БД
-    Button(frame_db, text="Обновить данные", command=change_value).grid(row=4, column=0)
+    frame_button = WinFrame(master)
+    frame_button.grid(row=1, column=0, columnspan=2, rowspan=1, pady=10, padx=10)
+    Button(frame_button, text="Обновить данные", command=change_value).grid(row=0, column=0)

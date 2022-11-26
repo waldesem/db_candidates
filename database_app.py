@@ -1,63 +1,128 @@
+import sqlite3
 import subprocess
 from tkinter import *
 from tkinter import messagebox, ttk
 
 from docx import Document
 
-from about_app import about_db_pro
-from login_app import user_login
-from change_db import response_db, update_db, CONNECT, COLS, REGISTRY
-
-cols = COLS
-
-# Список с таблицами базы данных
-selector = ['Таблица кандидатов', 'Таблица обратной связи']
-viewcolumns = [cols[1]] + [cols[3]] + [cols[5]] + [cols[-3]] + [cols[-2]]
+from change_db import update_db, CONNECT, COLS
+from options_app import settings
 
 
-# выбор таблицы БД из выпадающего списка
-def select_item(event):
-    global cols
-    global viewcolumns
-    # получаем выбранный элемент
-    selection = combobox.get()
-    if selection == selector[1]:
-        cols = REGISTRY
-        viewcolumns = [REGISTRY[1]] + [REGISTRY[2]] + [REGISTRY[3]] + [REGISTRY[4]] + [REGISTRY[9]] + [REGISTRY[10]]
-    else:
+class Window(Tk):
+    """Объявляем класс Window для работы с окном"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.title('База данных')
+        self.geometry('1020x840')
+        self.columnconfigure(0, weight=1)
+        self.option_add('*Dialog.msg.font', 'Arial 10')
+
+
+class MainMenu:
+    """Объявляем класс MainMenu для меню приложения"""
+
+    def __init__(self, parent) -> None:
+        self.parent = parent
+        self.menu = Menu()
+        self.menu.add_command(label='Настройки', command=settings, font=('Arial', 10))
+        self.parent.config(menu=self.menu)
+
+
+class WinFrame(Frame):
+    """Объявляем класс WinFrame для работы с фреймами"""
+
+    def __init__(self, parent) -> None:
+        super().__init__(parent)
+
+
+class ButtonActions:
+    """Объявляем класс ButtonActions для событий кнопок"""
+
+    @staticmethod
+    # событие по нажатию кнопки  "Поиск" в БД записей по ФИО и дате рождения
+    def db_search():
+        # формируем запрос на поиск данных в БД
+        db_search_query = "SELECT * FROM candidates WHERE full_name like ? and birthday like ?"
+        db_search_value = tuple(map(str, [fio_search.get(), dr_search.get()]))
+        # создаем экземпляр класса БД и передаем запрос
+        search_db = Database(CONNECT, db_search_query, db_search_value)
+        # удаляем записи из таблицы, получаем и вставляем новые через функци класса Database
+        treeviewdb(search_db.response_db(), "Результат проверки", "Запись в БД не найдена")
+
+    @staticmethod
+    # событие по нажатию кнопки "Обновить данные" в окне таблицы
+    def start_query():
+        # формируем запрос на поиск данных в БД
+        start_query_query = "SELECT * FROM candidates ORDER BY date_check DESC LIMIT 5"
+        # создаем экземпляр класса БД
+        query_db = Database(CONNECT, start_query_query, value='')
+        # удаляем записи из таблицы, получаем и вставляем новые
+        treeviewdb(query_db.response_db(), "Ошибка", "БД не подключена")
+
+    @staticmethod
+    # событие по нажатию кнопки "Выгрузить данные" из БД
+    def take_info():
+        file_query = '/home/semenenko/Загрузки/yourfile.docx'
+        document = Document()
+        # создаем таблицу Word
+        table = document.add_table(rows=len(COLS), COLS=2)
+        table.style = 'Table Grid'
+        for j in range(len(COLS)):
+            table.rows[j].cells[0].text = COLS[j]
+            table.rows[j].cells[1].text = selected_people.split('\n')[j]
+        document.save(file_query)
+        subprocess.call(["xdg-open", file_query])
+
+    @staticmethod
+    # событие по нажатию кнопки "Изменить данные" запись в БД
+    def change_db():
+        # вызов дочернего окна и передача переменной с выбранными данными
+        update_db(selected_people.split('\n'))
+
+    @staticmethod
+    # событие по нажатию чекбокса "Включить ДР в поиск" запись в БД
+    def change_check_button():
         pass
 
 
-# клик по кнопке поиск в БД записей по ФИО и дате рождения
-def db_search():
-    query = "SELECT * FROM candidates WHERE full_name like ? and birthday like ?"
-    value = tuple(map(str, [fio_search.get(), dr_search.get()]))
+class Database:
+    """Объявляем класс Database для работы с базой данных"""
+
+    def __init__(self, database, query, value):
+        self.database = database
+        self.query = query
+        self.value = value
+
+    # функция для передачи запроса в БД
+    def response_db(self):
+        try:
+            with sqlite3.connect(self.database, timeout=5.0) as con:
+                cur = con.cursor()
+                cur.execute(self.query, self.value)
+                record_db = cur.fetchall()
+        except sqlite3.Error as error:
+            print('Ошибка', error)
+        return record_db
+
+
+# функция удаления записи из таблицы treeview, получает и вставляет новые данные
+def treeviewdb(function, title, message):
     try:
-        search = [h for h in response_db(CONNECT, query, value)]
         # удаляем старые записи в окне таблицы
         for m in tree.get_children():
             tree.delete(m)
-        # записываем найденные записи
-        for k in range(len(search)):
-            tree.insert('', 'end', values=search[k])
+        # получаем данные в виде списка через SQL запрос 
+        response = [h for h in function]
+        # записываем найденные записи в окно
+        for k in range(len(response)):
+            tree.insert('', 'end', values=response[k])
     except IndexError:
-        messagebox.showinfo(title="Результат проверки", message="Запись в БД не найдена")
+        messagebox.showinfo(title=title, message=message)
 
 
-# обновить данные в окне таблицы
-def start_query():
-    query = "SELECT * FROM candidates ORDER BY date_check DESC LIMIT 5"
-    try:
-        for h in tree.get_children():
-            tree.delete(h)
-        start_search = [j for j in response_db(CONNECT, query, value='')]
-        for s in range(len(start_search)):
-            tree.insert('', 'end', values=start_search[s])
-    except IndexError:
-        messagebox.showinfo(title="Ошибка", message="БД не подключена")
-
-
-# выбор строки в таблице базы данных и показ в текстовом поле
+# событие по нажатию строки в таблице базы данных и показ в виджете "Текст"
 selected_people = ""
 
 
@@ -71,57 +136,20 @@ def item_selected(event):
     return selected_people
 
 
-# клик по кнопке Выгрузка информации из БД
-def take_info():
-    file_query = '/home/semenenko/Загрузки/yourfile.docx'
-    document = Document()
-    # создаем таблицу Word
-    table = document.add_table(rows=len(cols), cols=2)
-    table.style = 'Table Grid'
-    for j in range(len(cols)):
-        table.rows[j].cells[0].text = cols[j]
-        table.rows[j].cells[1].text = selected_people.split('\n')[j]
-    document.save(file_query)
-    subprocess.call(["xdg-open", file_query])
-
-
-# клик по кнопке меню изменить запись в БД
-def change_db():
-    update_db(selected_people.split('\n'))
-
-
+# главное окно приложения
 if __name__ == '__main__':
-    master = Tk()
-    master.title('База данных')
-    master.geometry('1020x840')
-    # окно сообщений
-    master.option_add('*Dialog.msg.font', 'Arial 10')
-    master.columnconfigure(0, weight=1)
-    # master.rowconfigure(0, weight=1)
-
-    main_menu = Menu()
-    menu_label_lst = ['Войти в БД', 'Настройки', 'О программе']
-    command_lst = [user_login, 'change_settings', about_db_pro]
-    for n in range(len(command_lst)):
-        main_menu.add_command(label=menu_label_lst[n], command=command_lst[n], font=('Arial', 10))
-        master.config(menu=main_menu)
+    # окно сообщений   
+    master = Window()
+    # меню приложения
+    main_menu = MainMenu(master)
 
     # фрейм виджетов базы данных
-    db_frame = Frame(master)
+    db_frame = WinFrame(master)
     db_frame.grid(row=0, column=0, columnspan=4, rowspan=1, pady=10, padx=10)
     for i in range(3):
         db_frame.columnconfigure(i, weight=1)
 
-    # комбобокс выбора таблицы с данными
-    Label(db_frame, text='Выбор таблицы', font=('Arial', 10),
-          width=30, anchor='w', padx=10, pady=10).grid(row=2, column=0)
-    combobox = ttk.Combobox(db_frame, values=selector, state="readonly", width=40)
-    combobox.current(0)
-    combobox.grid(row=2, column=1, pady=10, padx=10)
-    combobox.bind("<<ComboboxSelected>>", select_item)
-    Button(db_frame, text="Применить", command=lambda: master.update).grid(row=2, column=2)
-
-    # создаем название видежетов на вкладке База данных
+    # название видежетов на вкладке База данных
     txt_search = ['Фамилия Имя Отчество', 'Дата рождения']
     for i in range(len(txt_search)):
         Label(db_frame, text=f"{txt_search[i]}", font=('Arial', 10),
@@ -132,21 +160,26 @@ if __name__ == '__main__':
     dr_search = StringVar()
     dr_search.set("ДД.ММ.ГГГГ")
     Entry(db_frame, textvariable=dr_search, width=40).grid(row=1, column=1)
-    Label(db_frame, text='Найти по условиям:', font=('Arial', 10),
-          width=40, anchor='center', padx=10, pady=10).grid(row=0, column=2)
-    Button(db_frame, text="Поиск", command=db_search).grid(row=1, column=2)
-    Button(db_frame, text="Выгрузить данные", command=take_info).grid(row=0, column=3)
-    Button(db_frame, text="Изменить данные", command=change_db).grid(row=1, column=3)
-    Button(db_frame, text="Обновить данные", command=start_query).grid(row=2, column=3)
+    # чекбокс для включения в запрос даты рождения(пока не работает)
+    check_button = IntVar()
+    enabled_check_button = ttk.Checkbutton(db_frame, text='Включить ДР в поиск', variable=check_button,
+                                           command='change_check_button')
+    enabled_check_button.grid(padx=10, pady=10, row=1, column=2)
+    # кнопки обновления информации в таблице и поиска в БД (в зависимости от чекбокса по ФИО или +ДР)
+    Button(db_frame, text="Обновить данные", command=ButtonActions.start_query, width=20).grid(row=0, column=3)
+    Button(db_frame, text="Поиск данных", command=ButtonActions.db_search, width=20).grid(row=1, column=3)
 
     # фрейм и таблица записей из БД
-    frame_table = Frame(master)
-    frame_table.grid(row=1, column=0, columnspan=4, rowspan=1, padx=10, pady=10, sticky="nsew")
+    frame_table = WinFrame(master)
+    frame_table.grid(row=1, column=0, columnspan=4, rowspan=1, padx=10, pady=0, sticky="nsew")
     for i in range(3):
         frame_table.columnconfigure(i, weight=1)
 
     Label(frame_table, text='Результаты поиска:', font=('Arial', 11, 'bold'),
           width=30, anchor='center', padx=10, pady=10).grid(columnspan=3, row=0, column=0)
+    # кнопки выгрузки информации в таблицу WORD и изменения в БД (окткрываетя отдельное окно)
+    Button(frame_table, text="Выгрузить данные", command=ButtonActions.take_info).grid(row=3, column=0)
+    Button(frame_table, text="Изменить данные", command=ButtonActions.change_db).grid(row=3, column=2)
 
     # настройки скролбаров
     x_scrollbar = Scrollbar(frame_table, orient='horizontal')
@@ -155,8 +188,8 @@ if __name__ == '__main__':
     y_scrollbar.grid(row=1, column=4, sticky='N' + 'S')
 
     # размещение столбцов, строк  и др.
-    tree = ttk.Treeview(frame_table, columns=cols, height=5, show="headings",
-                        displaycolumns=viewcolumns,
+    tree = ttk.Treeview(frame_table, columns=COLS, height=5, show="headings",
+                        displaycolumns=[COLS[1]] + [COLS[3]] + [COLS[5]] + [COLS[-3]] + [COLS[-2]],
                         xscrollcommand=x_scrollbar.set, yscrollcommand=y_scrollbar.set)
     tree.grid(row=1, column=0, columnspan=3, sticky='E' + 'W')
     x_scrollbar['command'] = tree.xview
@@ -171,7 +204,7 @@ if __name__ == '__main__':
     tree.bind("<<TreeviewSelect>>", item_selected)
 
     # фрейм и текстовое поле для выбранной записи из таблицы БД
-    frame_select = Frame(master)
+    frame_select = WinFrame(master)
     frame_select.grid(row=2, column=0, columnspan=4, rowspan=1, pady=10, padx=20, sticky="nsew")
     for i in range(3):
         frame_select.columnconfigure(i, weight=1)
