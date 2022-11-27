@@ -2,7 +2,8 @@ from tkinter import Toplevel, Label, Button, Frame, Text, ttk, messagebox
 import sqlite3
 
 # местонахождение базы данных
-CONNECT = r'\\cronosx1\New folder\УВБ\Отдел корпоративной защиты\candidates.db'
+# CONNECT = r'\\cronosx1\New folder\УВБ\Отдел корпоративной защиты\candidates.db'
+CONNECT = '/home/semenenko/MyProjects/Python/Share_db_files/candidates.db'
 
 # название столбцов таблицы кандидатов базы данных
 SQL = ['id', 'staff', 'department', 'full_name', 'last_name', 'birthday', 'birth_place', 'country', 'series_passport',
@@ -25,7 +26,7 @@ class TopWindow(Toplevel):
     def __init__(self) -> None:
         super().__init__()
         self.title('База данных')
-        self.geometry('640x560')
+        self.geometry('640x580')
         self.columnconfigure(0, weight=1)
         self.option_add('*Dialog.msg.font', 'Arial 10')
 
@@ -65,9 +66,9 @@ def update_db(selected_people):
 
     # изменение записей в БД
     def change_value():
-        query = f"UPDATE candidates SET '{sql_col_dict[idx]}' = ? where id = ?"
+        change_query = f"UPDATE candidates SET '{sql_col_dict[idx]}' = ? where id = ?"
         value = tuple(map(str, [editor.get("1.0", "end").strip(), selected_people[0]]))
-        response = Database(CONNECT, query, value)
+        response = Database(CONNECT, change_query, value)
         resp = response.insert_db()
         if len(resp):
             messagebox.showinfo(title="Ошибка", message="Проверьте данные", parent=master)

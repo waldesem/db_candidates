@@ -6,7 +6,6 @@ from tkinter import messagebox, ttk
 from docx import Document
 
 from change_db import update_db, CONNECT, COLS
-from options_app import settings
 
 
 class Window(Tk):
@@ -26,7 +25,7 @@ class MainMenu:
     def __init__(self, parent) -> None:
         self.parent = parent
         self.menu = Menu()
-        self.menu.add_command(label='Настройки', command=settings, font=('Arial', 10))
+        self.menu.add_command(label='Настройки', command='settings', font=('Arial', 10))
         self.parent.config(menu=self.menu)
 
 
@@ -67,7 +66,7 @@ class ButtonActions:
         file_query = '/home/semenenko/Загрузки/yourfile.docx'
         document = Document()
         # создаем таблицу Word
-        table = document.add_table(rows=len(COLS), COLS=2)
+        table = document.add_table(rows=len(COLS), cols=2)
         table.style = 'Table Grid'
         for j in range(len(COLS)):
             table.rows[j].cells[0].text = COLS[j]
@@ -82,7 +81,7 @@ class ButtonActions:
         update_db(selected_people.split('\n'))
 
     @staticmethod
-    # событие по нажатию чекбокса "Включить ДР в поиск" запись в БД
+    # событие по нажатию чекбокса "Включить ДР в поиск" запись в БД (не работает)
     def change_check_button():
         pass
 
@@ -160,9 +159,9 @@ if __name__ == '__main__':
     dr_search = StringVar()
     dr_search.set("ДД.ММ.ГГГГ")
     Entry(db_frame, textvariable=dr_search, width=40).grid(row=1, column=1)
-    # чекбокс для включения в запрос даты рождения(пока не работает)
+    # чекбокс для включения в запрос даты рождения
     check_button = IntVar()
-    enabled_check_button = ttk.Checkbutton(db_frame, text='Включить ДР в поиск', variable=check_button,
+    enabled_check_button = ttk.Checkbutton(db_frame, text='Вкл.', variable=check_button,
                                            command='change_check_button')
     enabled_check_button.grid(padx=10, pady=10, row=1, column=2)
     # кнопки обновления информации в таблице и поиска в БД (в зависимости от чекбокса по ФИО или +ДР)
@@ -188,8 +187,9 @@ if __name__ == '__main__':
     y_scrollbar.grid(row=1, column=4, sticky='N' + 'S')
 
     # размещение столбцов, строк  и др.
+    displaycolumns = [COLS[1]] + [COLS[3]] + [COLS[5]] + [COLS[-3]] + [COLS[-2]]
     tree = ttk.Treeview(frame_table, columns=COLS, height=5, show="headings",
-                        displaycolumns=[COLS[1]] + [COLS[3]] + [COLS[5]] + [COLS[-3]] + [COLS[-2]],
+                        displaycolumns=displaycolumns,
                         xscrollcommand=x_scrollbar.set, yscrollcommand=y_scrollbar.set)
     tree.grid(row=1, column=0, columnspan=3, sticky='E' + 'W')
     x_scrollbar['command'] = tree.xview
