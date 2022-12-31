@@ -1,4 +1,4 @@
-from tkinter import *
+from tkinter import Toplevel, Frame, Text, Scrollbar, Button
 from tkinter import ttk
 
 from backend import *
@@ -7,45 +7,33 @@ from backend import *
 class ChildWin:
     """Class gui elements"""
 
-    def __init__(self, window):  # create window
-        self.root = window
+    def __init__(self):  # create window
+        self.root = Toplevel()
         self.root.title('Изменить базу данных')
         self.root.geometry('760x580')
         self.root.resizable(False, False)
+        self.child_win()
 
     def create_frame(self, **kwargs):  # create frame
         self.frame = Frame(self.root)
         self.frame.grid(kwargs)
         return self.frame
 
-    def create_yscrollbar (self, frame, ont, com, **kwargs):
-        self.scroll = Scrollbar(frame, orient=ont, command=com)
-        self.scroll.grid(kwargs)
-        return self.scroll
+    def child_win(self):
+        self.combo_frame = self.create_frame(row=0, column=0, columnspan=2, rowspan=1, pady=10, padx=10)
+        self.txt = Text(self.combo_frame)
+        self.txt.grid(column=0, row=1, sticky='nsew')
+        self.combobox = ttk.Combobox(self.combo_frame, values=COLS, state="readonly")
+        self.combobox.grid(row=0, column=0, pady=10, padx=10)
+        self.combobox.bind("<<ComboboxSelected>>", lambda event: text_edit(self.txt, Selection.selected[Selection.index]))
+        self.scroll = Scrollbar(self.combo_frame, orient="vertical", command=self.txt.yview)
+        self.scroll.grid(column=1, row=1, sticky='ns')
+        self.txt["yscrollcommand"] = self.scroll.set
+        self.button_frame = self.create_frame(row=1, column=0, columnspan=2, rowspan=1, pady=10, padx=10)
+        Button(self.button_frame, text="Обновить", command=lambda: change(self.root, self.txt)).grid(row=0, column=0)
 
-    def sroll_text_edit(self, frame, **kwargs):
-        self.txt = Text(frame)
-        self.txt.grid(kwargs)
-        return self.txt
 
-    def child_app(self):    # secondary window
-        events_cld = Development() # exemplar of class Development from events_app module
-        # создаем фреймы
-        frame_cdb = self.create_frame(row=0, column=0, columnspan=2, rowspan=1, pady=10, padx=10)
-        frame_set = self.create_frame(row=1, column=0, columnspan=2, rowspan=1, pady=10, padx=10)
-        # виджеты-кнопки
-        Button(frame_set, text="Обновить", command=lambda: events_cld.change(self.root, txt_chd)).grid(row=0, column=0)
-        # создаем комбобокс
-        cbox = ttk.Combobox(frame_cdb, values=COLS, state="readonly")
-        cbox.grid(row=1, column=0, pady=10, padx=10) # команда ниже выбирает из меню cbox и создает текст
-        cbox.bind("<<ComboboxSelected>>", lambda event:
-        Development.text_edit(txt_chd, events_cld.select[events_cld.combo_select(cbox)]))
-        # создаем текстовое поле
-        txt_chd = self.sroll_text_edit(frame_cdb, column=0, row=2, sticky='N' + 'S' + 'E' + 'W')
-        scrollbar = self.create_yscrollbar(frame_cdb, "vertical", txt_chd.yview, column=1, row=2, sticky='ns')
-        txt_chd["yscrollcommand"] = scrollbar.set
+def child_app():   
+    ChildWin() # secondary window
 
-def change_app ():
-    window = Toplevel()
-    child = ChildWin(window)
-    child.child_app()
+
